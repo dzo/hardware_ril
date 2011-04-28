@@ -206,7 +206,6 @@ static void dispatchDataCall (Parcel& p, RequestInfo *pRI);
 static void dispatchVoiceRadioTech (Parcel& p, RequestInfo *pRI);
 static void dispatchCdmaSubscriptionSource (Parcel& p, RequestInfo *pRI);
 static void dispatchDepersonalization(Parcel &p, RequestInfo *pRI);
-
 static void dispatchCdmaSms(Parcel &p, RequestInfo *pRI);
 static void dispatchImsSms(Parcel &p, RequestInfo *pRI);
 static void dispatchImsCdmaSms(Parcel &p, RequestInfo *pRI);
@@ -243,6 +242,7 @@ static int responseCdmaCallWaiting(Parcel &p,void *response, size_t responselen)
 static int responseGetDataCallProfile(Parcel &p, void *response, size_t responselen);
 static int responseUiccSubscription(Parcel &p, void *response,size_t responselen);
 static int responseSSData(Parcel &p, void *response, size_t responselen);
+static int responseSimRefresh(Parcel &p, void *response, size_t responselen);
 
 static int decodeVoiceRadioTechnology (RIL_RadioState radioState);
 static int decodeCdmaSubscriptionSource (RIL_RadioState radioState);
@@ -2338,6 +2338,43 @@ static int responseCdmaCallWaiting(Parcel &p, void *response,
             p_cur->signalInfoRecord.signal,
             p_cur->number_type,
             p_cur->number_plan);
+    closeResponse;
+
+    return 0;
+}
+
+static int responseSimRefresh(Parcel &p, void *response, size_t responselen) {
+    if (response == NULL && responselen != 0) {
+        LOGE("responseSimRefresh: invalid response: NULL");
+        return RIL_ERRNO_INVALID_RESPONSE;
+    }
+
+    startResponse;
+    if (s_callbacks.version < 6) {
+        int *p_cur = ((int *) response);
+        p.writeInt32(p_cur[0]);
+        p.writeInt32(p_cur[1]);
+        writeStringToParcel(p, "");
+
+        appendPrintBuf("%sresult=%d, ef_id=%d",
+                printBuf,
+                p_cur[0],
+                p_cur[1]);
+    } else if (responselen == sizeof (RIL_SimRefreshResponse_v6)) {
+        RIL_SimRefreshResponse_v6 *p_cur = ((RIL_SimRefreshResponse_v6 *) response);
+        p.writeInt32(p_cur->result);
+        p.writeInt32(p_cur->ef_id);
+        writeStringToParcel(p, p_cur->aid);
+
+        appendPrintBuf("%sresult=%d, ef_id=%d, aid=%s",
+                printBuf,
+                p_cur->result,
+                p_cur->ef_id,
+                p_cur->aid);
+    } else {
+        LOGE("responseSimRefresh: Received invalid response length (%d)\n", responselen);
+        return RIL_ERRNO_INVALID_RESPONSE;
+    }
     closeResponse;
 
     return 0;

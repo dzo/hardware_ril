@@ -1263,7 +1263,7 @@ static void  requestEnterSimPin(void*  data, size_t  datalen, RIL_Token  t)
 
     if ( datalen == sizeof(char*) ) {
         asprintf(&cmd, "AT+CPIN=%s", strings[0]);
-    } else if ( datalen == 2*sizeof(char*) ) {
+    } else if ( datalen == 2*sizeof(char*) || datalen == 3 * sizeof(char*)) {
         asprintf(&cmd, "AT+CPIN=%s,%s", strings[0], strings[1]);
     } else
         goto error;
