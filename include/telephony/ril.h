@@ -3598,6 +3598,25 @@ typedef struct {
  */
 #define RIL_REQUEST_SET_SUBSCRIPTION_MODE 114
 
+/**
+ * RIL_REQUEST_SET_TRANSMIT_POWER
+ *
+ * Request to set the transmit power that is allowed
+ *
+ * "data" is const int *
+ * ((int *)data)[0] is == 0 restore default transmit power
+ * ((int *)data)[0] is == 1 reduce transmit power as per FCC regulations
+ *                          (CFR47 2.1093) for WiFi hotspot
+ *
+ * "response" is NULL
+ *
+ * Valid errors:
+ *  SUCCESS
+ *  RADIO_NOT_AVAILABLE
+ *  GENERIC_FAILURE
+ */
+#define RIL_REQUEST_SET_TRANSMIT_POWER 115
+
 
 /***********************************************************************/
 

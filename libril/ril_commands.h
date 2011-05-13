@@ -129,3 +129,4 @@
     {RIL_REQUEST_GET_UICC_SUBSCRIPTION, dispatchVoid, responseUiccSubscription},
     {RIL_REQUEST_GET_DATA_SUBSCRIPTION, dispatchVoid, responseInts},
     {RIL_REQUEST_SET_SUBSCRIPTION_MODE, dispatchInts, responseVoid},
+    {RIL_REQUEST_SET_TRANSMIT_POWER, dispatchInts, responseVoid},
