@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <telephony/ril_cdma_sms.h>
 #include <telephony/ril_qos.h>
+#include <telephony/ril_msim.h>
 #ifndef FEATURE_UNIT_TEST
 #include <sys/time.h>
 #endif /* !FEATURE_UNIT_TEST */
@@ -856,24 +857,6 @@ typedef struct {
   int  profileId;
   int  priority;       /* priority. [0..255], 0 - highest */
 } RIL_DataCallProfileInfo;
-
-typedef enum {
-  RIL_UICC_SUBSCRIPTION_DEACTIVATE = 0,
-  RIL_UICC_SUBSCRIPTION_ACTIVATE = 1,
-} RIL_UiccSubActStatus;
-
-typedef enum {
-  RIL_SUBSCRIPTION_1 = 0,
-  RIL_SUBSCRIPTION_2 = 1
-} RIL_SubscriptionType;
-
-typedef struct {
-  int   slot;                        /* 0, 1, ... etc. */
-  int   app_index;                   /* array subscriptor from applications[RIL_CARD_MAX_APPS] in
-                                        RIL_REQUEST_GET_SIM_STATUS */
-  RIL_SubscriptionType  sub_type;    /* Indicates subscription 0 or subscription 1 */
-  RIL_UiccSubActStatus  act_status;
-} RIL_SelectUiccSub;
 
 typedef enum {
   SS_CFU,
@@ -4405,14 +4388,14 @@ struct RIL_Env {
                            void *response, size_t responselen);
 
     /**
-     * "unsolResponse" is one of RIL_UNSOL_RESPONSE_*
-     * "data" is pointer to data defined for that RIL_UNSOL_RESPONSE_*
-     *
+     * @param unsolResponse is one of RIL_UNSOL_RESPONSE_*
+     * @param data is pointer to data defined for that RIL_UNSOL_RESPONSE_*
      * "data" is owned by caller, and should not be modified or freed by callee
+     * @param datalen the length of data in byte
      */
 
     void (*OnUnsolicitedResponse)(int unsolResponse, const void *data,
-                                    size_t datalen);
+                                   size_t datalen);
 
     /**
      * Call user-specifed "callback" function on on the same thread that
