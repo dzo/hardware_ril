@@ -495,6 +495,7 @@ typedef struct {
 
 
 typedef enum {
+    RIL_APPSTATE_ILLEGAL               = -1,
     RIL_APPSTATE_UNKNOWN               = 0,
     RIL_APPSTATE_DETECTED              = 1,
     RIL_APPSTATE_PIN                   = 2, /* If PIN1 or UPin is required */
