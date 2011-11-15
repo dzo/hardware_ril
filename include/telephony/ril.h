@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2006 The Android Open Source Project
+ * Copyright (C) 2006,2011 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -469,7 +469,9 @@ typedef struct {
 typedef enum {
     RIL_CARDSTATE_ABSENT   = 0,
     RIL_CARDSTATE_PRESENT  = 1,
-    RIL_CARDSTATE_ERROR    = 2
+    RIL_CARDSTATE_ERROR    = 2,
+    RIL_CARDSTATE_NOT_INITIALIZED = 3 /* Card is being initialized, Telephony layer should wait till
+                                         the state becomes ABSENT/ERROR/PRESENT */
 } RIL_CardState;
 
 typedef enum {
@@ -838,6 +840,24 @@ typedef struct {
   int  profileId;
   int  priority;       /* priority. [0..255], 0 - highest */
 } RIL_DataCallProfileInfo;
+
+typedef enum {
+  RIL_UICC_SUBSCRIPTION_DEACTIVATE = 0,
+  RIL_UICC_SUBSCRIPTION_ACTIVATE = 1,
+} RIL_UiccSubActStatus;
+
+typedef enum {
+  RIL_SUBSCRIPTION_1 = 0,
+  RIL_SUBSCRIPTION_2 = 1
+} RIL_SubscriptionType;
+
+typedef struct {
+  int   slot;                        /* 0, 1, ... etc. */
+  int   app_index;                   /* array subscriptor from applications[RIL_CARD_MAX_APPS] in
+                                        RIL_REQUEST_GET_SIM_STATUS */
+  RIL_SubscriptionType  sub_type;    /* Indicates subscription 0 or subscription 1 */
+  RIL_UiccSubActStatus  act_status;
+} RIL_SelectUiccSub;
 
 typedef enum {
   SS_CFU,
@@ -3467,6 +3487,102 @@ typedef struct {
  */
 #define RIL_REQUEST_GET_DATA_CALL_PROFILE 109
 
+/**
+ * RIL_REQUEST_SET_UICC_SUBSCRIPTION
+ *
+ * Selects/deselects a particular application/subscription to use on a particular SIM card
+ * "data" is const  RIL_SelectUiccSub*
+ *
+ * "response" is NULL
+ *
+ *  Valid errors:
+ *  SUCCESS
+ *  RADIO_NOT_AVAILABLE (radio resetting)
+ *  GENERIC_FAILURE
+ *  SUBSCRIPTION_NOT_AVAILABLE
+ *  SUBSCRIPTION_NOT_SUPPORTED
+ *
+ */
+#define RIL_REQUEST_SET_UICC_SUBSCRIPTION  110
+
+/**
+ *  RIL_REQUEST_SET_DATA_SUBSCRIPTION
+ *
+ *  Selects a subscription for data call setup
+ * "data" is NULL
+ *
+ * "response" is NULL
+ *
+ *  Valid errors:
+ *
+ *  SUCCESS
+ *  RADIO_NOT_AVAILABLE (radio resetting)
+ *  GENERIC_FAILURE
+ *  SUBSCRIPTION_NOT_AVAILABLE
+ *
+ */
+#define RIL_REQUEST_SET_DATA_SUBSCRIPTION  111
+
+/**
+ * RIL_REQUEST_GET_UICC_SUBSCRIPTION
+ *
+ * Request to query the UICC subscription info
+ * that is currently set.
+ *
+ * "data" is NULL
+ *
+ * "response" is const RIL_SelectUiccSub *
+ *
+ * Valid errors:
+ *  SUCCESS
+ *  RADIO_NOT_AVAILABLE
+ *  GENERIC_FAILURE
+ *  SUBSCRIPTION_NOT_AVAILABLE
+ *
+ */
+#define RIL_REQUEST_GET_UICC_SUBSCRIPTION 112
+
+/**
+ * RIL_REQUEST_GET_DATA_SUBSCRIPTION
+ *
+ * Request to query the Data subscription info
+ * that is currently set.
+ *
+ * "data" is NULL
+ *
+ * "response" is int *
+ * ((int *)data)[0] is == 0  Indicates data is active on subscription 0
+ * ((int *)data)[0] is == 1  Indicates data is active on subscription 1
+ *
+ * Valid errors:
+ *  SUCCESS
+ *  RADIO_NOT_AVAILABLE
+ *  GENERIC_FAILURE
+ *  SUBSCRIPTION_NOT_AVAILABLE
+ *
+ */
+#define RIL_REQUEST_GET_DATA_SUBSCRIPTION 113
+
+/**
+ *  RIL_REQUEST_SET_SUBSCRIPTION_MODE
+ *
+ *  Sets the SUBSCRIPTION_MODE to DualStandBy/SingleStandBy
+ * "data" is const int *
+ * ((const int *)data) [0]    1 indicates SingleStandBy Mode
+                              2 indicates DualStandBy Mode
+ *
+ * "response" is NULL
+ *
+ *  Valid errors:
+ *
+ *  SUCCESS
+ *  RADIO_NOT_AVAILABLE (radio resetting)
+ *  GENERIC_FAILURE
+ *  SUBSCRIPTION_NOT_AVAILABLE
+ *
+ */
+#define RIL_REQUEST_SET_SUBSCRIPTION_MODE 114
+
 
 /***********************************************************************/
 
@@ -4002,6 +4118,21 @@ typedef struct {
  *
  */
 #define RIL_UNSOL_STK_CC_ALPHA_NOTIFY 1040
+
+/**
+ * RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED
+ *
+ * Called when there is a change in subscription status.
+ * This event will be sent in the following scenarios
+ *  - subscription readiness at modem, which was selected by telephony layer
+ *  - when subscription is deactivated by modem due to UICC card removal
+ *
+ * "data" is const int *
+ * ((const int *)data)[0] == 0 for Subscription Deactivated
+ * ((const int *)data)[0] == 1 for Subscription Activated
+ *
+ */
+#define RIL_UNSOL_UICC_SUBSCRIPTION_STATUS_CHANGED 1041
 
 /***********************************************************************/
 
