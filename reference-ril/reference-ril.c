@@ -41,6 +41,13 @@
 
 
 #define LOG_TAG "RIL"
+//uncomment this block to enable logging from this file.
+/*
+#define LOG_NDEBUG 0
+#define LOG_NDDEBUG 0
+#define LOG_NIDEBUG 0
+*/
+
 #include <utils/Log.h>
 
 #define MAX_AT_RESPONSE 0x1000
@@ -211,6 +218,13 @@ static char *sATBufferCur = NULL;
 static const struct timeval TIMEVAL_SIMPOLL = {1,0};
 static const struct timeval TIMEVAL_CALLSTATEPOLL = {0,500000};
 static const struct timeval TIMEVAL_0 = {0,0};
+
+static int s_ims_registered  = 0;        // 0==unregistered
+static int s_ims_encoding    = 1;        // RADIO_TECH_3GPP(1) vs RADIO_TECH_3GPP2(2);
+static int s_ims_cause_retry = 0;        // 1==causes sms over ims to temp fail
+static int s_ims_cause_perm_failure = 0; // 1==causes sms over ims to permanent fail
+static int s_ims_gsm_retry   = 0;        // 1==causes sms over gsm to temp fail
+static int s_ims_gsm_fail    = 0;        // 1==causes sms over gsm to permanent fail
 
 #ifdef WORKAROUND_ERRONEOUS_ANSWER
 // Max number of times we'll try to repoll when we think
@@ -1468,6 +1482,7 @@ static void requestCdmaSendSMS(void *data, size_t datalen, RIL_Token t)
     RIL_SMS_Response response;
     RIL_CDMA_SMS_Message* rcsm;
 
+    memset(&response, 0, sizeof(response));
     LOGD("requestCdmaSendSMS datalen=%d, sizeof(RIL_CDMA_SMS_Message)=%d",
             datalen, sizeof(RIL_CDMA_SMS_Message));
 
@@ -1484,14 +1499,14 @@ static void requestCdmaSendSMS(void *data, size_t datalen, RIL_Token t)
 
     // Cdma Send SMS implementation will go here:
     // But it is not implemented yet.
-
-    memset(&response, 0, sizeof(response));
+    response.messageRef = 1;
     RIL_onRequestComplete(t, RIL_E_SUCCESS, &response, sizeof(response));
     return;
 
 error:
     // Cdma Send SMS will always cause send retry error.
-    RIL_onRequestComplete(t, RIL_E_SMS_SEND_FAIL_RETRY, NULL, 0);
+    response.messageRef = -1;
+    RIL_onRequestComplete(t, RIL_E_SMS_SEND_FAIL_RETRY, &response, sizeof(response));
 }
 
 static void requestSendSMS(void *data, size_t datalen, RIL_Token t)
@@ -1504,6 +1519,12 @@ static void requestSendSMS(void *data, size_t datalen, RIL_Token t)
     RIL_SMS_Response response;
     ATResponse *p_response = NULL;
 
+    memset(&response, 0, sizeof(response));
+    LOGD("requestSendSMS datalen =%d", datalen);
+
+    if (s_ims_gsm_fail != 0) goto error;
+    if (s_ims_gsm_retry != 0) goto error2;
+
     smsc = ((const char **)data)[0];
     pdu = ((const char **)data)[1];
 
@@ -1513,6 +1534,7 @@ static void requestSendSMS(void *data, size_t datalen, RIL_Token t)
     if (smsc == NULL) {
         smsc= "00";
     }
+    LOGD("smsc=%s, pdu=%s", smsc, pdu);
 
     asprintf(&cmd1, "AT+CMGS=%d", tpLayerLength);
     asprintf(&cmd2, "%s%s", smsc, pdu);
@@ -1521,17 +1543,67 @@ static void requestSendSMS(void *data, size_t datalen, RIL_Token t)
 
     if (err != 0 || p_response->success == 0) goto error;
 
-    memset(&response, 0, sizeof(response));
-
     /* FIXME fill in messageRef and ackPDU */
-
+    response.messageRef = 1;
     RIL_onRequestComplete(t, RIL_E_SUCCESS, &response, sizeof(response));
     at_response_free(p_response);
 
     return;
 error:
-    RIL_onRequestComplete(t, RIL_E_GENERIC_FAILURE, NULL, 0);
+    response.messageRef = -2;
+    RIL_onRequestComplete(t, RIL_E_GENERIC_FAILURE, &response, sizeof(response));
     at_response_free(p_response);
+    return;
+error2:
+    // send retry error.
+    response.messageRef = -1;
+    RIL_onRequestComplete(t, RIL_E_SMS_SEND_FAIL_RETRY, &response, sizeof(response));
+    at_response_free(p_response);
+    return;
+}
+
+static void requestImsSendSMS(void *data, size_t datalen, RIL_Token t)
+{
+    RIL_IMS_SMS_Message *p_args;
+    RIL_SMS_Response response;
+
+    memset(&response, 0, sizeof(response));
+
+    LOGD("requestImsSendSMS: datalen=%d, "
+        "registered=%d, encoding=%d, imgs_perm_fail=%d, ims_retry=%d,"
+        "gsm_fail=%d, gsm_retry=%d",
+        datalen, s_ims_registered, s_ims_encoding, s_ims_cause_perm_failure,
+        s_ims_cause_retry, s_ims_gsm_fail, s_ims_gsm_retry);
+
+    // figure out if this is gsm/cdma encoding
+    // then route it to requestSendSMS vs requestCdmaSendSMS respectively
+    p_args = (RIL_IMS_SMS_Message *)data;
+
+    if (0 != s_ims_cause_perm_failure ) goto error;
+
+    // want to fail over ims and this is first request over ims
+    if (0 != s_ims_cause_retry && 0 == p_args->retry) goto error2;
+
+    if (RADIO_TECH_3GPP == p_args->tech) {
+        return requestSendSMS(p_args->message.gsmMessage,
+                datalen - sizeof(RIL_RadioTechnologyFamily),
+                t);
+    } else if (RADIO_TECH_3GPP2 == p_args->tech) {
+        return requestCdmaSendSMS(p_args->message.cdmaMessage,
+                datalen - sizeof(RIL_RadioTechnologyFamily),
+                t);
+    } else {
+        LOGE("requestImsSendSMS invalid tech value =%d", p_args->tech);
+    }
+
+error:
+    response.messageRef = -2;
+    RIL_onRequestComplete(t, RIL_E_GENERIC_FAILURE, &response, sizeof(response));
+    return;
+
+error2:
+    response.messageRef = -1;
+    RIL_onRequestComplete(t, RIL_E_SMS_SEND_FAIL_RETRY, &response, sizeof(response));
 }
 
 static void requestSetupDataCall(void *data, size_t datalen, RIL_Token t)
@@ -2195,6 +2267,9 @@ onRequest (int request, void *data, size_t datalen, RIL_Token t)
         case RIL_REQUEST_CDMA_SEND_SMS:
             requestCdmaSendSMS(data, datalen, t);
             break;
+        case RIL_REQUEST_IMS_SEND_SMS:
+            requestImsSendSMS(data, datalen, t);
+            break;
         case RIL_REQUEST_SETUP_DATA_CALL:
             requestSetupDataCall(data, datalen, t);
             break;
@@ -2315,6 +2390,24 @@ onRequest (int request, void *data, size_t datalen, RIL_Token t)
             requestEnterSimPin(data, datalen, t);
             break;
 
+       case RIL_REQUEST_IMS_REGISTRATION_STATE:
+        {
+            int reply[2];
+            //0==unregistered, 1==registered
+            reply[0] = s_ims_registered;
+
+            // For IMS testing. For now make IMS encoding match with voice tech.
+            // RADIO_TECH_3GPP(1) vs RADIO_TECH_3GPP2(2);
+            reply[1] = s_ims_encoding; //techFamilyFromModemType(TECH(sMdmInfo));
+
+            LOGD("IMS_REGISTRATION = %d, encoding= %d ",reply[0],reply[1]);
+            if (reply[1] != -1) {
+                RIL_onRequestComplete(t, RIL_E_SUCCESS, reply, sizeof(reply));
+            } else {
+                RIL_onRequestComplete(t, RIL_E_GENERIC_FAILURE, NULL, 0);
+            }
+            break;
+        }
        case RIL_REQUEST_SETUP_QOS:
             requestSetupQos(data, datalen, t);
             break;

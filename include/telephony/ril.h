@@ -254,6 +254,11 @@ typedef struct {
 
 typedef struct {
     RIL_RadioTechnologyFamily tech;
+    unsigned char             retry;       /* 0 == not retry, nonzero == retry */
+    int                       messageRef;  /* Valid field if retry is set to nonzero.
+                                              Contains messageRef from RIL_SMS_Response
+                                              corresponding to failed MO SMS.
+                                            */
 
     union {
         /* Valid field if tech is RADIO_TECH_3GPP2. See RIL_REQUEST_CDMA_SEND_SMS */
@@ -3449,8 +3454,8 @@ typedef struct {
  * Based on the return error, caller decides to resend if sending sms
  * fails.
  * SUCCESS is error class 0 (no error)
- * SMS_SEND_FAIL_RETRY will cause re-send using RIL_REQUEST_CDMA_SEND_SMS
- *   or RIL_REQUEST_SEND_SMS based on Voice Technology available.
+ * SMS_SEND_FAIL_RETRY will cause re-send with data encoded
+ *   based on Voice Technology available.
  * and GENERIC_FAILURE means no retry.
  *
  * Valid errors:

@@ -17,6 +17,12 @@
 */
 
 #define LOG_TAG "RILC"
+//uncomment this block to enable logging from this file.
+#if 0
+#define LOG_NDEBUG 0
+#define LOG_NDDEBUG 0
+#define LOG_NIDEBUG 0
+#endif
 
 #include <hardware_legacy/power.h>
 
@@ -225,8 +231,8 @@ static void dispatchCdmaSubscriptionSource (Parcel& p, RequestInfo *pRI);
 static void dispatchDepersonalization(Parcel &p, RequestInfo *pRI);
 static void dispatchCdmaSms(Parcel &p, RequestInfo *pRI);
 static void dispatchImsSms(Parcel &p, RequestInfo *pRI);
-static void dispatchImsCdmaSms(Parcel &p, RequestInfo *pRI);
-static void dispatchImsGsmSms(Parcel &p, RequestInfo *pRI);
+static void dispatchImsCdmaSms(Parcel &p, RequestInfo *pRI, uint8_t retry, int32_t messageRef);
+static void dispatchImsGsmSms(Parcel &p, RequestInfo *pRI, uint8_t retry, int32_t messageRef);
 static void dispatchCdmaSmsAck(Parcel &p, RequestInfo *pRI);
 static void dispatchGsmBrSmsCnf(Parcel &p, RequestInfo *pRI);
 static void dispatchCdmaBrSmsCnf(Parcel &p, RequestInfo *pRI);
@@ -1052,20 +1058,24 @@ invalid:
 }
 
 static void
-dispatchImsCdmaSms(Parcel &p, RequestInfo *pRI) {
+dispatchImsCdmaSms(Parcel &p, RequestInfo *pRI, uint8_t retry, int32_t messageRef) {
     RIL_IMS_SMS_Message rism;
     RIL_CDMA_SMS_Message rcsm;
 
-    LOGD("dispatchImsCdmaSms");
+    LOGD("dispatchImsCdmaSms: retry=%d, messageRef=%d", retry, messageRef);
+
     if (NO_ERROR != constructCdmaSms(p, pRI, rcsm)) {
         goto invalid;
     }
     memset(&rism, 0, sizeof(rism));
     rism.tech = RADIO_TECH_3GPP2;
+    rism.retry = retry;
+    rism.messageRef = messageRef;
     rism.message.cdmaMessage = &rcsm;
 
     s_callbacks[pRI->client_id].onRequest(pRI->pCI->requestNumber, &rism,
-            sizeof(RIL_RadioTechnologyFamily)+sizeof(rcsm),pRI);
+            sizeof(RIL_RadioTechnologyFamily)+sizeof(uint8_t)+sizeof(int32_t)
+            +sizeof(rcsm),pRI);
 
 #ifdef MEMSET_FREED
     memset(&rcsm, 0, sizeof(rcsm));
@@ -1080,12 +1090,13 @@ invalid:
 }
 
 static void
-dispatchImsGsmSms(Parcel &p, RequestInfo *pRI) {
+dispatchImsGsmSms(Parcel &p, RequestInfo *pRI, uint8_t retry, int32_t messageRef) {
     RIL_IMS_SMS_Message rism;
     int32_t countStrings;
     status_t status;
     size_t datalen;
     char **pStrings;
+    LOGD("dispatchImsGsmSms: retry=%d, messageRef=%d", retry, messageRef);
 
     status = p.readInt32 (&countStrings);
 
@@ -1095,6 +1106,8 @@ dispatchImsGsmSms(Parcel &p, RequestInfo *pRI) {
 
     memset(&rism, 0, sizeof(rism));
     rism.tech = RADIO_TECH_3GPP;
+    rism.retry = retry;
+    rism.messageRef = messageRef;
 
     startRequest;
     appendPrintBuf("%stech=%d,", printBuf, rism.tech);
@@ -1121,7 +1134,8 @@ dispatchImsGsmSms(Parcel &p, RequestInfo *pRI) {
 
     rism.message.gsmMessage = pStrings;
     s_callbacks[pRI->client_id].onRequest(pRI->pCI->requestNumber, &rism,
-            sizeof(RIL_RadioTechnologyFamily)+datalen, pRI);
+            sizeof(RIL_RadioTechnologyFamily)+sizeof(uint8_t)+sizeof(int32_t)
+            +datalen, pRI);
 
     if (pStrings != NULL) {
         for (int i = 0 ; i < countStrings ; i++) {
@@ -1151,6 +1165,8 @@ dispatchImsSms(Parcel &p, RequestInfo *pRI) {
     int32_t  t;
     status_t status = p.readInt32(&t);
     RIL_RadioTechnologyFamily tech;
+    uint8_t retry;
+    int32_t messageRef;
 
     LOGD("dispatchImsSms");
     if (status != NO_ERROR) {
@@ -1158,10 +1174,21 @@ dispatchImsSms(Parcel &p, RequestInfo *pRI) {
     }
     tech = (RIL_RadioTechnologyFamily) t;
 
+    // read retry field
+    status = p.read(&retry,sizeof(retry));
+    if (status != NO_ERROR) {
+        goto invalid;
+    }
+    // read messageRef field
+    status = p.read(&messageRef,sizeof(messageRef));
+    if (status != NO_ERROR) {
+        goto invalid;
+    }
+
     if (RADIO_TECH_3GPP == tech) {
-        dispatchImsGsmSms(p, pRI);
+        dispatchImsGsmSms(p, pRI, retry, messageRef);
     } else if (RADIO_TECH_3GPP2 == tech) {
-        dispatchImsCdmaSms(p, pRI);
+        dispatchImsCdmaSms(p, pRI, retry, messageRef);
     } else {
         LOGE("requestImsSendSMS invalid tech value =%d", tech);
     }
