@@ -18,6 +18,7 @@
 #define ANDROID_RIL_H 1
 
 #include <stdlib.h>
+#include <telephony/ril_cdma_sms.h>
 #ifndef FEATURE_UNIT_TEST
 #include <sys/time.h>
 #endif /* !FEATURE_UNIT_TEST */
@@ -129,6 +130,11 @@ typedef enum {
    CDMA_SUBSCRIPTION_SOURCE_NV = 1
 } RIL_CdmaSubscriptionSource;
 
+typedef enum {
+    RADIO_TECH_3GPP = 1, /* 3GPP Technologies - GSM, WCDMA */
+    RADIO_TECH_3GPP2 = 2 /* 3GPP2 Technologies - CDMA */
+} RIL_RadioTechnologyFamily;
+
 /* User-to-User signaling Info activation types derived from 3GPP 23.087 v8.0 */
 typedef enum {
     RIL_UUS_TYPE1_IMPLICIT = 0,
@@ -231,6 +237,19 @@ typedef struct {
                                    May be empty in which case the addresses represent point
                                    to point connections. */
 } RIL_Data_Call_Response_v6;
+
+
+typedef struct {
+    RIL_RadioTechnologyFamily tech;
+
+    union {
+        /* Valid field if tech is RADIO_TECH_3GPP2. See RIL_REQUEST_CDMA_SEND_SMS */
+        RIL_CDMA_SMS_Message* cdmaMessage;
+
+        /* Valid field if tech is RADIO_TECH_3GPP. See RIL_REQUEST_SEND_SMS */
+        char**                gsmMessage;
+    } message;
+} RIL_IMS_SMS_Message;
 
 typedef struct {
     int messageRef;   /* TP-Message-Reference for GSM,
@@ -469,6 +488,12 @@ typedef enum {
     RIL_PERSOSUBSTATE_RUIM_RUIM_PUK             = 24
 } RIL_PersoSubstate;
 
+typedef struct {
+    RIL_PersoSubstate depersonalizationType;
+    char             *depersonalizationCode;
+} RIL_Depersonalization;
+
+
 typedef enum {
     RIL_APPSTATE_UNKNOWN               = 0,
     RIL_APPSTATE_DETECTED              = 1,
@@ -511,7 +536,6 @@ typedef struct
   RIL_PinState     pin2;
 } RIL_AppStatus;
 
-/* Deprecated, use RIL_CardStatus_v6 */
 typedef struct
 {
   RIL_CardState card_state;
@@ -954,12 +978,11 @@ typedef struct {
 #define RIL_REQUEST_CHANGE_SIM_PIN2 7
 
 /**
- * RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION
+ * RIL_REQUEST_ENTER_DEPERSONALIZATION_CODE
  *
  * Requests that network personlization be deactivated
  *
- * "data" is const char **
- * ((const char **)(data))[0]] is network depersonlization code
+ * "data" is const RIL_Depersonalization*
  *
  * "response" is int *
  * ((int *)response)[0] is the number of retries remaining, or -1 if unknown
@@ -973,7 +996,7 @@ typedef struct {
  *     (code is invalid)
  */
 
-#define RIL_REQUEST_ENTER_NETWORK_DEPERSONALIZATION 8
+#define RIL_REQUEST_ENTER_DEPERSONALIZATION_CODE 8
 
 /**
  * RIL_REQUEST_GET_CURRENT_CALLS
@@ -3242,6 +3265,55 @@ typedef struct {
  */
 #define RIL_REQUEST_VOICE_RADIO_TECH 106
 
+/**
+ * RIL_REQUEST_IMS_REGISTRATION_STATE
+ *
+ * Request current IMS registration state
+ *
+ * "data" is NULL
+ *
+ * "response" is int *
+ * ((int *)response)[0] is == 0 for IMS not registered
+ * ((int *)response)[0] is == 1 for IMS registered
+ *
+ * If ((int*)response)[0] is = 1, then ((int *) response)[1]
+ * must follow with IMS SMS encoding:
+ *
+ * ((int *) response)[1] is of type const RIL_RadioTechnologyFamily
+ *
+ * Valid errors:
+ *  SUCCESS
+ *  RADIO_NOT_AVAILABLE
+ *  GENERIC_FAILURE
+ */
+#define RIL_REQUEST_IMS_REGISTRATION_STATE 107
+
+/**
+ * RIL_REQUEST_IMS_SEND_SMS
+ *
+ * Send a SMS message over IMS
+ *
+ * "data" is const RIL_IMS_SMS_Message *
+ *
+ * "response" is a const RIL_SMS_Response *
+ *
+ * Based on the return error, caller decides to resend if sending sms
+ * fails.
+ * SUCCESS is error class 0 (no error)
+ * SMS_SEND_FAIL_RETRY will cause re-send using RIL_REQUEST_CDMA_SEND_SMS
+ *   or RIL_REQUEST_SEND_SMS based on Voice Technology available.
+ * and GENERIC_FAILURE means no retry.
+ *
+ * Valid errors:
+ *  SUCCESS
+ *  RADIO_NOT_AVAILABLE
+ *  SMS_SEND_FAIL_RETRY
+ *  FDN_CHECK_FAILURE
+ *  GENERIC_FAILURE
+ *
+ */
+#define RIL_REQUEST_IMS_SEND_SMS 108
+
 
 /***********************************************************************/
 
@@ -3718,6 +3790,45 @@ typedef struct {
  */
 #define RIL_UNSOL_VOICE_RADIO_TECH_CHANGED 1035
 
+/**
+ * RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED
+ *
+ * Called when data network states has changed
+ *
+ * Callee will invoke the following requests on main thread:
+ *
+ * RIL_REQUEST_IMS_REGISTRATION_STATE
+  *
+ * "data" is NULL
+ *
+ */
+#define RIL_UNSOL_RESPONSE_IMS_NETWORK_STATE_CHANGED 1036
+
+
+/**
+ * RIL_UNSOL_RESPONSE_TETHERED_MODE_STATE_CHANGED
+ *
+ * Called when tethered mode is enabled or disabled
+ *
+ *
+ * "data" is an int 0 - tethered mode off, 1 - tethered mode on
+ *
+ */
+#define RIL_UNSOL_RESPONSE_TETHERED_MODE_STATE_CHANGED 1037
+
+/**
+ * RIL_UNSOL_RESPONSE_DATA_NETWORK_STATE_CHANGED
+ *
+ * Called when data network states has changed
+  *
+ * Callee will invoke the following requests on main thread:
+ *
+ * RIL_REQUEST_DATA_REGISTRATION_STATE
+  *
+ * "data" is NULL
+ *
+ */
+#define RIL_UNSOL_RESPONSE_DATA_NETWORK_STATE_CHANGED 1038
 
 /***********************************************************************/
 
