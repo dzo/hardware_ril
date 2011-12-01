@@ -34,16 +34,33 @@ LOCAL_SRC_FILES:= \
 LOCAL_SHARED_LIBRARIES := \
     libz libcutils libutils libril
 
+
 LOCAL_STATIC_LIBRARIES := \
-    libv8
+    libprotobuf-cpp-2.3.0-full
+
+ifeq ($(DYNAMIC_SHARED_LIBV8SO),true)
+    LOCAL_SHARED_LIBRARIES += libv8
+else
+    LOCAL_STATIC_LIBRARIES += libv8
+endif
 
 LOCAL_CFLAGS := -D_GNU_SOURCE -UNDEBUG -DRIL_SHLIB
 
+ifeq ($(DYNAMIC_SHARED_LIBV8SO),true)
+LOCAL_C_INCLUDES := \
+    $(LOCAL_PATH)/$(src_cpp) \
+    $(LOCAL_PATH)/$(gen_src_cpp) \
+    external/protobuf/src \
+    vendor/qcom/opensource/v8/include \
+    bionic \
+    $(KERNEL_HEADERS)
+else
 LOCAL_C_INCLUDES := \
     $(LOCAL_PATH)/$(src_cpp) \
     external/v8/include \
     bionic \
     $(KERNEL_HEADERS)
+endif
 
 LOCAL_SHARED_LIBRARIES += libstlport
 LOCAL_C_INCLUDES += external/stlport/stlport
