@@ -41,7 +41,12 @@ LOCAL_STATIC_LIBRARIES := \
 ifeq ($(DYNAMIC_SHARED_LIBV8SO),true)
     LOCAL_SHARED_LIBRARIES += libv8
 else
+  # v8 is built as shared lib if proteus device api feature is on
+  ifeq ($(PROTEUS_DEVICE_API),true)
+    LOCAL_SHARED_LIBRARIES += libv8
+  else
     LOCAL_STATIC_LIBRARIES += libv8
+  endif
 endif
 
 LOCAL_CFLAGS := -D_GNU_SOURCE -UNDEBUG -DRIL_SHLIB
