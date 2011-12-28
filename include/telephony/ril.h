@@ -3403,6 +3403,54 @@ typedef struct {
 #define RIL_REQUEST_ISIM_AUTHENTICATION 105
 
 /**
+ * RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU
+ *
+ * Acknowledge successful or failed receipt of SMS previously indicated
+ * via RIL_UNSOL_RESPONSE_NEW_SMS, including acknowledgement TPDU to send
+ * as the RP-User-Data element of the RP-ACK or RP-ERROR PDU.
+ *
+ * "data" is const char **
+ * ((const char **)data)[0] is "1" on successful receipt (send RP-ACK)
+ *                          is "0" on failed receipt (send RP-ERROR)
+ * ((const char **)data)[1] is the acknowledgement TPDU in hexadecimal format
+ *
+ * "response" is NULL
+ *
+ * Valid errors:
+ *  SUCCESS
+ *  RADIO_NOT_AVAILABLE
+ *  GENERIC_FAILURE
+ */
+#define RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU 106
+
+/**
+ * RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS
+ *
+ * Requests to send a SAT/USAT envelope command to SIM.
+ * The SAT/USAT envelope command refers to 3GPP TS 11.14 and 3GPP TS 31.111.
+ *
+ * This request has one difference from RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND:
+ * the SW1 and SW2 status bytes from the UICC response are returned along with
+ * the response data, using the same structure as RIL_REQUEST_SIM_IO.
+ *
+ * The RIL implementation shall perform the normal processing of a '91XX'
+ * response in SW1/SW2 to retrieve the pending proactive command and send it
+ * as an unsolicited response, as RIL_REQUEST_STK_SEND_ENVELOPE_COMMAND does.
+ *
+ * "data" is a const char * containing the SAT/USAT command
+ * in hexadecimal format starting with command tag
+ *
+ * "response" is a const RIL_SIM_IO_Response *
+ *
+ * Valid errors:
+ *  RIL_E_SUCCESS
+ *  RIL_E_RADIO_NOT_AVAILABLE (radio resetting)
+ *  RIL_E_GENERIC_FAILURE
+ */
+#define RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS 107
+
+
+/**
  * RIL_REQUEST_VOICE_RADIO_TECH
  *
  * Query the radio technology type (3GPP/3GPP2) used for voice. Query is valid only
@@ -3417,7 +3465,7 @@ typedef struct {
  *  RADIO_NOT_AVAILABLE
  *  GENERIC_FAILURE
  */
-#define RIL_REQUEST_VOICE_RADIO_TECH 106
+#define RIL_REQUEST_VOICE_RADIO_TECH 108
 
 /**
  * RIL_REQUEST_IMS_REGISTRATION_STATE
@@ -3440,7 +3488,7 @@ typedef struct {
  *  RADIO_NOT_AVAILABLE
  *  GENERIC_FAILURE
  */
-#define RIL_REQUEST_IMS_REGISTRATION_STATE 107
+#define RIL_REQUEST_IMS_REGISTRATION_STATE 109
 
 /**
  * RIL_REQUEST_IMS_SEND_SMS
@@ -3466,7 +3514,7 @@ typedef struct {
  *  GENERIC_FAILURE
  *
  */
-#define RIL_REQUEST_IMS_SEND_SMS 108
+#define RIL_REQUEST_IMS_SEND_SMS 110
 
 /**
  * RIL_REQUEST_GET_DATA_CALL_PROFILE
@@ -3489,7 +3537,7 @@ typedef struct {
  *  RIL_E_DATA_CALL_PROFILE_NOT_AVAILABLE
  *
  */
-#define RIL_REQUEST_GET_DATA_CALL_PROFILE 109
+#define RIL_REQUEST_GET_DATA_CALL_PROFILE 111
 
 /**
  * RIL_REQUEST_SET_UICC_SUBSCRIPTION
@@ -3507,7 +3555,7 @@ typedef struct {
  *  SUBSCRIPTION_NOT_SUPPORTED
  *
  */
-#define RIL_REQUEST_SET_UICC_SUBSCRIPTION  110
+#define RIL_REQUEST_SET_UICC_SUBSCRIPTION  112
 
 /**
  *  RIL_REQUEST_SET_DATA_SUBSCRIPTION
@@ -3525,7 +3573,7 @@ typedef struct {
  *  SUBSCRIPTION_NOT_AVAILABLE
  *
  */
-#define RIL_REQUEST_SET_DATA_SUBSCRIPTION  111
+#define RIL_REQUEST_SET_DATA_SUBSCRIPTION  113
 
 /**
  * RIL_REQUEST_GET_UICC_SUBSCRIPTION
@@ -3544,7 +3592,7 @@ typedef struct {
  *  SUBSCRIPTION_NOT_AVAILABLE
  *
  */
-#define RIL_REQUEST_GET_UICC_SUBSCRIPTION 112
+#define RIL_REQUEST_GET_UICC_SUBSCRIPTION 114
 
 /**
  * RIL_REQUEST_GET_DATA_SUBSCRIPTION
@@ -3565,7 +3613,7 @@ typedef struct {
  *  SUBSCRIPTION_NOT_AVAILABLE
  *
  */
-#define RIL_REQUEST_GET_DATA_SUBSCRIPTION 113
+#define RIL_REQUEST_GET_DATA_SUBSCRIPTION 115
 
 /**
  *  RIL_REQUEST_SET_SUBSCRIPTION_MODE
@@ -3585,7 +3633,7 @@ typedef struct {
  *  SUBSCRIPTION_NOT_AVAILABLE
  *
  */
-#define RIL_REQUEST_SET_SUBSCRIPTION_MODE 114
+#define RIL_REQUEST_SET_SUBSCRIPTION_MODE 116
 
 /**
  * RIL_REQUEST_SET_TRANSMIT_POWER
@@ -3604,7 +3652,7 @@ typedef struct {
  *  RADIO_NOT_AVAILABLE
  *  GENERIC_FAILURE
  */
-#define RIL_REQUEST_SET_TRANSMIT_POWER 115
+#define RIL_REQUEST_SET_TRANSMIT_POWER 117
 
 /**
  * RIL_REQUEST_SETUP_QOS
@@ -3648,7 +3696,7 @@ typedef struct {
  *  SUCCESS
  *  GENERIC_FAILURE
  */
-#define RIL_REQUEST_SETUP_QOS 116
+#define RIL_REQUEST_SETUP_QOS 118
 
 /**
  * RIL_REQUEST_RELEASE_QOS
@@ -3664,7 +3712,7 @@ typedef struct {
  *  SUCCESS
  *  GENERIC_FAILURE
  */
-#define RIL_REQUEST_RELEASE_QOS 117
+#define RIL_REQUEST_RELEASE_QOS 119
 
 /**
  * RIL_REQUEST_GET_QOS_STATUS
@@ -3684,7 +3732,7 @@ typedef struct {
  *  SUCCESS
  *  GENERIC_FAILURE
  */
-#define RIL_REQUEST_GET_QOS_STATUS 118
+#define RIL_REQUEST_GET_QOS_STATUS 120
 
 /**
  * RIL_REQUEST_MODIFY_QOS
@@ -3705,7 +3753,7 @@ typedef struct {
  *  SUCCESS
  *  GENERIC_FAILURE
  */
-#define RIL_REQUEST_MODIFY_QOS 119
+#define RIL_REQUEST_MODIFY_QOS 121
 
 /**
  * RIL_REQUEST_SUSPEND_QOS
@@ -3722,7 +3770,7 @@ typedef struct {
  *  SUCCESS
  *  GENERIC_FAILURE
  */
-#define RIL_REQUEST_SUSPEND_QOS 120
+#define RIL_REQUEST_SUSPEND_QOS 122
 
 /**
  * RIL_REQUEST_RESUME_QOS
@@ -3738,8 +3786,7 @@ typedef struct {
  *  SUCCESS
  *  GENERIC_FAILURE
  */
-#define RIL_REQUEST_RESUME_QOS 121
-
+#define RIL_REQUEST_RESUME_QOS 123
 
 /***********************************************************************/
 

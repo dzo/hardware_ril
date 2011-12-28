@@ -3214,6 +3214,8 @@ eventLoop(void *param) {
     // Only returns on error
     ril_event_loop();
     LOGE ("error in event_loop_base errno:%d", errno);
+    // kill self to restart on error
+    kill(0, SIGKILL);
 
     return NULL;
 }
@@ -3940,6 +3942,8 @@ requestToString(int request) {
         case RIL_REQUEST_MODIFY_QOS: return "REQUEST_MODIFY_QOS";
         case RIL_REQUEST_SUSPEND_QOS: return "REQUEST_SUSPEND_QOS";
         case RIL_REQUEST_RESUME_QOS: return "REQUEST_RESUME_QOS";
+        case RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU: return "RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU";
+        case RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS: return "RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS";
         case RIL_UNSOL_RESPONSE_RADIO_STATE_CHANGED: return "UNSOL_RESPONSE_RADIO_STATE_CHANGED";
         case RIL_UNSOL_RESPONSE_CALL_STATE_CHANGED: return "UNSOL_RESPONSE_CALL_STATE_CHANGED";
         case RIL_UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED: return "UNSOL_RESPONSE_VOICE_NETWORK_STATE_CHANGED";

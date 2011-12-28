@@ -120,6 +120,8 @@
     {RIL_REQUEST_REPORT_STK_SERVICE_IS_RUNNING, dispatchVoid, responseVoid},
     {RIL_REQUEST_CDMA_GET_SUBSCRIPTION_SOURCE, dispatchCdmaSubscriptionSource, responseInts},
     {RIL_REQUEST_ISIM_AUTHENTICATION, dispatchString, responseString},
+    {RIL_REQUEST_ACKNOWLEDGE_INCOMING_GSM_SMS_WITH_PDU, dispatchStrings, responseVoid},
+    {RIL_REQUEST_STK_SEND_ENVELOPE_WITH_STATUS, dispatchString, responseSIM_IO},
     {RIL_REQUEST_VOICE_RADIO_TECH, dispatchVoiceRadioTech, responseInts},
     {RIL_REQUEST_IMS_REGISTRATION_STATE, dispatchVoid, responseInts},
     {RIL_REQUEST_IMS_SEND_SMS, dispatchImsSms, responseSMS},
@@ -136,4 +138,3 @@
     {RIL_REQUEST_MODIFY_QOS,        dispatchStrings, responseStrings},
     {RIL_REQUEST_SUSPEND_QOS,       dispatchStrings, responseVoid},
     {RIL_REQUEST_RESUME_QOS,        dispatchStrings, responseVoid},
-
