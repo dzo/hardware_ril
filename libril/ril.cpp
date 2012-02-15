@@ -1,7 +1,7 @@
 /* //device/libs/telephony/ril.cpp
 **
 ** Copyright 2006, The Android Open Source Project
-** Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+** Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -275,6 +275,8 @@ extern "C" const char * requestToString(int request);
 extern "C" const char * failCauseToString(RIL_Errno);
 extern "C" const char * callStateToString(RIL_CallState);
 extern "C" const char * radioStateToString(RIL_RadioState);
+extern "C" int isMultiSimEnabled();
+extern "C" int isMultiRild();
 
 #ifdef RIL_SHLIB
 extern "C" void RIL_onUnsolicitedResponse(int unsolResponse, void *data,
@@ -323,13 +325,27 @@ void printfds() {
 
 static int addClientFd(int fd) {
     int ret = -1;
-    for(int i = 0; i < MAX_NUM_CLIENTS; i++) {
-        if (client_fds[i].fd_status == FD_STATUS_INACTIVE) {
-            client_fds[i].fd = fd;
-            client_fds[i].fd_status = FD_STATUS_ACTIVE;
-            ret = i;
-            break;
+    if (isMultiSimEnabled() && !isMultiRild()) {
+        // DSDS with single rild case
+        for(int i = 0; i < MAX_NUM_CLIENTS; i++) {
+            if (client_fds[i].fd_status == FD_STATUS_INACTIVE) {
+                client_fds[i].fd = fd;
+                client_fds[i].fd_status = FD_STATUS_ACTIVE;
+                ret = i;
+                break;
+            }
         }
+    } else {
+        // Non DSDS case or DSDS with Multi rild case.
+        /* We need to clean the stale broken socket fd, otherwise,
+           there will be file descriptor leakage */
+        if (client_fds[DEFAULT_SUB].fd_status == FD_STATUS_ACTIVE) {
+            close(client_fds[DEFAULT_SUB].fd);
+        }
+
+        client_fds[DEFAULT_SUB].fd = fd;
+        client_fds[DEFAULT_SUB].fd_status = FD_STATUS_ACTIVE;
+        ret = DEFAULT_SUB;
     }
     printfds();
     return ret;
@@ -4000,6 +4016,34 @@ requestToString(int request) {
         case RIL_UNSOL_QOS_STATE_CHANGED_IND: return "UNSOL_QOS_STATE_CHANGED_IND";
         default: return "<unknown request>";
     }
+}
+
+int isMultiSimEnabled()
+{
+    int enabled = 0;
+    char prop_val[PROPERTY_VALUE_MAX];
+    if (property_get("persist.dsds.enabled", prop_val, "0") > 0)
+    {
+        if (strncmp(prop_val, "true", 4) == 0) {
+            enabled = 1;
+        }
+        LOGE("isMultiSimEnabled: prop_val = %s enabled = %d", prop_val, enabled);
+    }
+    return enabled;
+}
+
+int isMultiRild()
+{
+    int enabled = 0;
+    char prop_val[PROPERTY_VALUE_MAX];
+    if (property_get("ro.multi.rild", prop_val, "0") > 0)
+    {
+        if (strncmp(prop_val, "true", 4) == 0) {
+            enabled = 1;
+        }
+        LOGD("isMultiRild: prop_val = %s enabled = %d", prop_val, enabled);
+    }
+    return enabled;
 }
 
 } /* namespace android */

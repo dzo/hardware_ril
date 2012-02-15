@@ -1,7 +1,7 @@
 /* //device/system/rild/rild.c
 **
 ** Copyright 2006, The Android Open Source Project
-** Copyright (c) 2010-2011, Code Aurora Forum. All rights reserved.
+** Copyright (c) 2010-2012, Code Aurora Forum. All rights reserved.
 **
 ** Licensed under the Apache License, Version 2.0 (the "License");
 ** you may not use this file except in compliance with the License.
@@ -60,8 +60,8 @@ extern void RIL_requestTimedCallback (RIL_TimedCallback callback,
 
 extern void RIL_setMaxNumClients(int num_clients);
 
-static int isMultiSimEnabled();
-static int isMultiRild();
+extern int isMultiSimEnabled();
+extern int isMultiRild();
 
 static struct RIL_Env s_rilEnv = {
     RIL_onRequestComplete,
@@ -328,32 +328,4 @@ done:
         // sleep(UINT32_MAX) seems to return immediately on bionic
         sleep(0x00ffffff);
     }
-}
-
-static int isMultiSimEnabled()
-{
-    int enabled = 0;
-    char prop_val[PROPERTY_VALUE_MAX];
-    if (property_get("persist.dsds.enabled", prop_val, "0") > 0)
-    {
-        if (strncmp(prop_val, "true", 4) == 0) {
-            enabled = 1;
-        }
-        LOGE("isMultiSimEnabled: prop_val = %s enabled = %d", prop_val, enabled);
-    }
-    return enabled;
-}
-
-static int isMultiRild()
-{
-    int enabled = 0;
-    char prop_val[PROPERTY_VALUE_MAX];
-    if (property_get("ro.multi.rild", prop_val, "0") > 0)
-    {
-        if (strncmp(prop_val, "true", 4) == 0) {
-            enabled = 1;
-        }
-        LOGD("isMultiRild: prop_val = %s enabled = %d", prop_val, enabled);
-    }
-    return enabled;
 }

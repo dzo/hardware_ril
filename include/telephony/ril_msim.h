@@ -1,4 +1,4 @@
-/* Copyright (c) 2011, Code Aurora Forum. All rights reserved.
+/* Copyright (c) 2011-2012 Code Aurora Forum. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -33,6 +33,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define DEFAULT_SUB 0
 
 typedef enum {
   RIL_UICC_SUBSCRIPTION_DEACTIVATE = 0,
