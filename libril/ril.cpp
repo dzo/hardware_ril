@@ -18,7 +18,7 @@
 
 #define LOG_TAG "RILC"
 //uncomment this block to enable logging from this file.
-#if 0
+#if 1
 #define LOG_NDEBUG 0
 #define LOG_NDDEBUG 0
 #define LOG_NIDEBUG 0
@@ -55,6 +55,8 @@
 #include <assert.h>
 #include <netinet/in.h>
 #include <cutils/properties.h>
+#include <termios.h>
+
 
 #include <ril_event.h>
 
@@ -277,6 +279,149 @@ extern "C" const char * callStateToString(RIL_CallState);
 extern "C" const char * radioStateToString(RIL_RadioState);
 extern "C" int isMultiSimEnabled();
 extern "C" int isMultiRild();
+
+static char *response[64];
+static int getnetwork_stat=0; // 0=idle, 1=searching, 2=found
+
+static int writeline (int s_fd,const char *s)
+{
+    size_t cur = 0;
+    size_t len = strlen(s);
+    ssize_t written;
+
+    /* the main string */
+    while (cur < len) {
+        do {
+            written = write (s_fd, s + cur, len - cur);
+        } while (written < 0 && errno == EINTR);
+
+        if (written < 0) {
+            return -1;
+        }
+
+        cur += written;
+    }
+
+    /* the \r  */
+
+    do {
+        written = write (s_fd, "\r" , 1);
+    } while ((written < 0 && errno == EINTR) || (written == 0));
+
+    if (written < 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
+static void *
+	getNetworksFromModem(void *req) {
+	struct termios  ios;
+	char sync_buf[256];
+	char *readbuf = sync_buf;
+	char *states[4] = {"unknown","available","current","forbidden"}; 
+	int seen[16] = {0,}; /* Max 16 operators */
+	int old_flags, i, networkCount=0;
+	int fd,sz;
+        RequestInfo *pRI;
+
+        pRI=(RequestInfo *)req;
+	if(getnetwork_stat!=0) {
+                LOGI("RIL busy");
+                getnetwork_stat=2;
+                RIL_onRequestComplete(pRI, RIL_E_GENERIC_FAILURE, NULL, 0);
+		return 0;
+        }
+	getnetwork_stat=1;
+
+	fd=open("/dev/smd0",O_RDWR);
+
+	if (fd<=0) {
+		LOGI("Can't open /dev/smd0");
+                getnetwork_stat=2;
+		RIL_onRequestComplete(pRI, RIL_E_GENERIC_FAILURE, NULL, 0);
+		return 0;
+	}
+	tcgetattr( fd, &ios );
+	ios.c_lflag = 0;
+	tcsetattr( fd, TCSANOW, &ios );
+//	old_flags = fcntl(fd, F_GETFL, 0);
+//	fcntl(fd, F_SETFL, old_flags | O_NONBLOCK);
+
+        writeline (fd,"AT+COPS=?");
+//	sleep(1);
+
+	do {
+            sz=read(fd,sync_buf,256);
+            LOGI("Read %s %d %d",sync_buf,sz);
+        } while ((sz < 0 && errno == EINTR) || !strstr(sync_buf,"+COPS:"));
+        close(fd);
+
+	if (sz>0) {
+		sync_buf[255]='\0';
+		char *readbuf = sync_buf;
+		while (strlen(readbuf)) {
+			char *output[4];
+			while (*readbuf != '(' && *readbuf !='\0') {
+				readbuf++;
+			}
+			output[0]=++readbuf;
+			while (*readbuf != ',') {
+				readbuf++;
+			}
+			*readbuf='\0'; readbuf+=2;
+			output[1]=readbuf;
+			while (*readbuf != ',') {
+				readbuf++;
+			}
+			*--readbuf='\0'; readbuf+=3;
+			output[2]=readbuf;
+			while (*readbuf != ',') {
+				readbuf++;
+			}
+			*--readbuf='\0'; readbuf+=3;
+			output[3]=readbuf;
+			while (*readbuf != ',') {
+				readbuf++;
+			}
+			*--readbuf='\0'; 
+			while (*readbuf != ')') {
+				readbuf++;
+			}
+			*readbuf++='\0';
+
+			int numericOperator = atoi(output[3]);
+			for (i=0; i<16 && seen[i]!=0; i++) {
+				if (seen[i] == numericOperator)
+					goto skipop;
+			}
+			seen[networkCount] = numericOperator;
+			LOGI("read %s %s %s %s",output[0],output[1],output[2],output[3]);
+
+			response[(networkCount*4)+0]=strdup(output[1]);
+			response[(networkCount*4)+1]=strdup(output[2]);
+			response[(networkCount*4)+2]=strdup(output[3]);
+			response[(networkCount*4)+3]=strdup(states[atoi(output[0])]);
+
+			networkCount++;
+skipop:	
+			if (!strncmp(readbuf,",,",2)) {
+				break;
+			}
+
+		}
+	} else {
+                LOGI("Failed to read from /dev/smd0 error:%d",errno);
+                getnetwork_stat=2;
+                RIL_onRequestComplete(pRI, RIL_E_GENERIC_FAILURE, NULL, 0);
+                return 0;
+        }
+        getnetwork_stat=2;
+        RIL_onRequestComplete(pRI, RIL_E_SUCCESS, response, networkCount*4*4);
+        return 0;
+}
+
 
 #ifdef RIL_SHLIB
 extern "C" void RIL_onUnsolicitedResponse(int unsolResponse, void *data,
@@ -3442,10 +3587,21 @@ checkAndDequeueRequestInfo(struct RequestInfo *pRI) {
 extern "C" void
 RIL_onRequestComplete(RIL_Token t, RIL_Errno e, void *response, size_t responselen) {
     RequestInfo *pRI;
+    static pthread_t pt;
     int ret;
     size_t errorOffset;
+    static char *netresp[256];
 
     pRI = (RequestInfo *)t;
+
+    if (pRI->pCI->requestNumber == RIL_REQUEST_QUERY_AVAILABLE_NETWORKS) {
+        if(getnetwork_stat!=2) { // not done
+            ret = pthread_create(&pt, NULL, getNetworksFromModem, (void *)pRI);
+            return;
+        }
+        getnetwork_stat=0; // idle
+    }
+
 
     if (!checkAndDequeueRequestInfo(pRI)) {
         LOGE ("RIL_onRequestComplete: invalid RIL_Token");
@@ -3462,6 +3618,7 @@ RIL_onRequestComplete(RIL_Token t, RIL_Errno e, void *response, size_t responsel
 
     appendPrintBuf("[%04d]< %s",
         pRI->token, requestToString(pRI->pCI->requestNumber));
+
 
     if (pRI->cancelled == 0) {
         Parcel p;
